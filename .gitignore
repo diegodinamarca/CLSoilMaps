@@ -1,0 +1,9 @@
+#Files to ignore
+*.txt
+*.tif
+*.zip
+data/area/
+data/covariates/
+data/postproc/
+data/soil_database/
+results/
