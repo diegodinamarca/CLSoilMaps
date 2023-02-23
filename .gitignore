@@ -7,3 +7,5 @@ data/covariates/
 data/postproc/
 data/soil_database/
 results/
+.Rproj.user
+CLSoilMaps.Rproj
