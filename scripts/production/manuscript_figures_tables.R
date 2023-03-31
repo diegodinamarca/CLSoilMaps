@@ -1,4 +1,3 @@
-
 {
   # HEADER --------------------------------------------
   #
@@ -59,6 +58,52 @@
   conflicted::conflict_prefer("extract", "terra")
   
   # LOAD FUNCTIONS ------------------------------------
+  # Extraer predicciones
+  get_pred_stats <- function(var, model, predictions){
+    pred.list <- list(rep(NA, 6))
+    for (i in 1:6){
+      # i = 1
+      pred.depth <- predictions %>% filter(depth == depths[i])
+      
+      #calculate mean prediction and residuals
+      n <- pred.depth %>% nrow()/100;n
+      # model = "QRF"
+      if (model == "QRF"){
+        qpred.list <- lapply(1:21, function(j){
+          qpred <- pred.depth[[j]] %>% matrix(nrow = n, byrow = F) %>%
+            as.data.frame() %>%
+            rowMeans()
+        }) %>% rlist::list.cbind() %>% as_tibble
+        names(qpred.list) <- names(pred.depth)[1:21]
+        qpred.list <- qpred.list %>%
+          bind_cols(depth = depths[i], obs = pred.depth$obs[1:n])%>%
+          mutate(error = obs-q0.5);qpred.list
+        pred.list[[i]] <- qpred.list  
+      }
+      if (model == "RF"){
+        pred.means <- pred.depth$predictions %>% matrix(nrow = n, byrow = F) %>%
+          as.data.frame() %>%
+          rowMeans() %>% 
+          bind_cols(pred.depth$obs[1:n]) %>%
+          rename(pred.mean = 1, obs = 2) %>%
+          mutate(error = obs-pred.mean,
+                 depth = depths[i])
+        
+        pred.var <- pred.depth$predictions %>% matrix(nrow = n, byrow = F) %>%
+          matrixStats::rowVars() %>%
+          as.data.frame() %>%
+          rename(pred.var = 1)
+        pred.var %>% bind_cols(pred.depth$obs[1:n])
+        
+        pred.list[[i]] <- bind_cols(pred.means, pred.var) %>% dplyr::select(c(2, 1, 5, 3, 4))
+      }
+      
+    }
+    pred.stats <- rlist::list.rbind(pred.list);pred.stats
+    pred.stats
+    
+    return(pred.stats)
+  }
   # space reserved for your functions
 }
 ###################### PARTE 1: FILTRAR DATOS DE 5-15CM PARA CARTOGRAFIAS ####################################
@@ -668,6 +713,8 @@ clay <- tex %>% dplyr::select(ID, val = Arcilla)
 sand <- tex %>% dplyr::select(ID, val = arena)
 silt <- tex %>% dplyr::select(ID, val = Limo)
 da <- da %>% dplyr::select(ID, val = Da)
+cc = filter(bd, CC != -999) %>% select(ID, val = CC)
+pmp = filter(bd, PMP !=-999) %>% select(ID, val = PMP)
 
 # Resumen estadistico por propiedad
 {
@@ -706,26 +753,50 @@ da <- da %>% dplyr::select(ID, val = Da)
                           desv = sd(val),
                           total = n())%>% 
     mutate(n_profiles = nprof, propiedad = "Bulk Density")
+  nprof <- cc %>% group_by(ID) %>% slice(1) %>% nrow
+  df5 <- cc %>% summarise(max = max(val),
+                          min = min(val),
+                          promedio = mean(val),
+                          mediana = median(val),
+                          desv = sd(val),
+                          total = n())%>% 
+    mutate(n_profiles = nprof, propiedad = "Field Cap.")
+  df6 <- pmp %>% summarise(max = max(val),
+                          min = min(val),
+                          promedio = mean(val),
+                          mediana = median(val),
+                          desv = sd(val),
+                          total = n())%>% 
+    mutate(n_profiles = nprof, propiedad = "Perm. Wilt. Point")
 }
-bd_summary <- bind_rows(df1,df2,df3,df4)
-bd_summary %>% write_csv("./plots/summary_bd.csv")
+bd_summary <- bind_rows(df1,df2,df3,df4,df5,df6)
+bd_summary %>% write_csv(here("results","tables","summary_bd.csv"))
 
 ######################## FIN PARTE 6 #####################
 #####-----------------------------------------------######
 ############# PARTE 7: CANTIDAD PUNTOS POR FUENTE #############################################
 
 bd <- read_csv(here("data","soil_database","BD_soilprof_23MAR.csv"))
-bd.p = bd %>% select(ID, Fuente, Arcilla, Da) %>% pivot_longer(cols = Arcilla:Da, names_to = "soil_att")
+bd.p = bd %>% select(ID, Fuente, Arcilla, PMP, CC, Da) %>% pivot_longer(cols = Arcilla:Da, names_to = "soil_att")
 bd.p %>% filter(value != -999) %>%   mutate(Fuente = if_else(Fuente == "Otros", "UChile",Fuente)) %>% 
   group_by(Fuente, soil_att) %>% 
   summarise(count = n())
   
-bd.p %>% filter(value != -999) %>%   mutate(Fuente = if_else(Fuente == "Otros", "UChile",Fuente)) %>% 
+bd.p %>% filter(value != -999) %>%  
+  mutate(Fuente = if_else(Fuente == "Otros", "UChile",Fuente)) %>% 
   group_by(ID, Fuente, soil_att) %>%
   slice(1) %>% 
   ungroup() %>% 
   group_by(Fuente, soil_att) %>% 
-  summarise(count = n())
+  summarise(count = n()) %>% 
+  pivot_wider(names_from = 'soil_att', values_from = 'count')
+
+bd.p %>% filter(value != -999) %>%  
+  mutate(Fuente = if_else(Fuente == "Otros", "UChile",Fuente)) %>% 
+  group_by(Fuente, soil_att) %>%
+  summarise(count = n()) %>% 
+  pivot_wider(names_from = 'soil_att', values_from = 'count')
+
 
 bd.p %>% Hmisc::describe()
 bd.p %>% skimr::skim()
@@ -734,19 +805,20 @@ bd <- bd %>% filter(Arcilla != -999 | Da != -999)
 bd %>% group_by(Fuente) %>% summarise(n = n()) %>% 
   write_csv(here("results","tables","Puntos_por_fuente.csv"))
 
-bd.p = bd %>% select(ID, x,y, Fuente, Arcilla, Da) %>% pivot_longer(cols = Arcilla:Da, names_to = "soil_att")
+bd.p = bd %>% select(ID, x,y, Fuente, Arcilla, Da, CC, PMP) %>% pivot_longer(cols = Arcilla:PMP, names_to = "soil_att")
 bd.p %>% filter(value != -999) %>%
   mutate(Fuente = if_else(Fuente == "Otros", "UChile",Fuente)) %>% 
   group_by(ID, Fuente, soil_att) %>%
   slice(1) %>% 
-  ungroup() %>% pivot_wider(names_from = "soil_att", values_from = "value") %>% 
+  ungroup() %>%
+  pivot_wider(names_from = "soil_att", values_from = "value") %>% 
   write_csv(file = here("results","tables","BD_para_cartografia.csv"))
 
 ######################## FIN PARTE 7 #####################
 #####-----------------------------------------------######
 ############# PARTE 8: MAPAS 0-5cm ######################
 
-# cargar mapas de suelo
+# load soil maps
 dir <- here("results","postproc","v1","SoilMaps_MEAN")
 list.files(dir)
 files <- list.files(dir, pattern = ".tif$", full.names = T);files
@@ -793,14 +865,15 @@ for (i in 1:4) {
 
 lay <- rbind(c(1,2,3))
 g <- arrangeGrob(grobs = plot.list[c(1,2,3)], layout_matrix = lay)
-ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm.png"), width = 10, height = 10)
+ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm.eps"), width = 10, height = 10)
 grid.arrange(grobs = plot.list, layout_matrix = lay)
+
 
 lay <- rbind(c(1,2),
              c(3,4))
-lay <- rbind(c(1,2,4,3))
+# lay <- rbind(c(1,2,4,3))
 g <- arrangeGrob(grobs = plot.list, layout_matrix = lay)
-ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm_wsilt.png"), width = 4, height = 6)
+ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm_wsilt.eps"), width = 4, height = 6)
 grid.arrange(grobs = plot.list, layout_matrix = lay)
 
 ######################## FIN PARTE 8 #####################
@@ -815,70 +888,12 @@ depths.nam <- c("2.5" = "0-5 cm" ,"10" = "5-15 cm", "22.5" = "15-30 cm","45" = "
 depths <- c(2.5, 10, 22.5, 45, 80, 150)
 var.eng <- c(Da = "Bulk Density", Arcilla = "Clay", Limo = "Silt", arena = "Sand")
 sel.nam <- c("upper_uncor" = "U", "lower_uncor" = "L")
+
 # vector of quantiles
 qp <- qnorm(c(0.995, 0.9875, 0.975, 0.95, 0.9, 0.8, 0.7, 0.6,
               0.55, 0.525))
 # percentiles
 cs <- c(99, 97.5, 95, 90, 80, 60, 40, 20, 10, 5)
-
-# Extraer predicciones
-get_pred_stats <- function(var, model, predictions){
-  pred.list <- list(rep(NA, 6))
-  for (i in 1:6){
-    # i = 1
-    pred.depth <- predictions %>% filter(depth == depths[i])
-    
-    #calculate mean prediction and residuals
-    n <- pred.depth %>% nrow()/100;n
-    # model = "QRF"
-    if (model == "QRF"){
-      qpred.list <- lapply(1:21, function(j){
-        qpred <- pred.depth[[j]] %>% matrix(nrow = n, byrow = F) %>%
-          as.data.frame() %>%
-          rowMeans()
-      }) %>% rlist::list.cbind() %>% as_tibble
-      names(qpred.list) <- names(pred.depth)[1:21]
-      qpred.list <- qpred.list %>%
-        bind_cols(depth = depths[i], obs = pred.depth$obs[1:n])%>%
-        mutate(error = obs-q0.5);qpred.list
-      pred.list[[i]] <- qpred.list  
-    }
-    if (model == "RF"){
-      pred.means <- pred.depth$predictions %>% matrix(nrow = n, byrow = F) %>%
-        as.data.frame() %>%
-        rowMeans() %>% 
-        bind_cols(pred.depth$obs[1:n]) %>%
-        rename(pred.mean = 1, obs = 2) %>%
-        mutate(error = obs-pred.mean,
-               depth = depths[i])
-      
-      pred.var <- pred.depth$predictions %>% matrix(nrow = n, byrow = F) %>%
-        matrixStats::rowVars() %>%
-        as.data.frame() %>%
-        rename(pred.var = 1)
-      pred.var %>% bind_cols(pred.depth$obs[1:n])
-      
-      pred.list[[i]] <- bind_cols(pred.means, pred.var) %>% dplyr::select(c(2, 1, 5, 3, 4))
-    }
-    
-  }
-  pred.stats <- rlist::list.rbind(pred.list);pred.stats
-  {
-    bd <- read_csv(str_c("./materiales/Database/",var,".csv"))
-    fuentes <-  bd$fuente[match(pred.stats$obs,bd[[5]])]
-    fuentes[fuentes == 1] <- "UChile"
-    fuentes[fuentes == 2] <- "CIREN"
-    fuentes[fuentes == 3] <- "CHLSOC"
-    fuentes[fuentes == 4] <- "WoSIS"
-    fuentes[fuentes == 5] <- "Otros"
-    pred.stats$fuente <- fuentes
-  }
-  pred.stats
-  
-  if (length(which(is.na(pred.stats$fuente))) != 0 ) pred.stats$fuente[which(is.na(pred.stats$fuente))] <- "CIREN"
-  
-  return(pred.stats)
-}
 
 #Selecion de modelos por profundidad
 p.list <- list()
@@ -886,8 +901,9 @@ m.list <- list()
 bound.list <- list()
 plot.list <- list()
 for (k in 1:3){
-  cat("Comenzando con ", var, "\n")
   var <- variables[k]
+  cat("Comenzando con ", var, "\n")
+  
   for (i in 1:6) {
     if (var == "Arcilla"){
       sel <- selection_clay[i]
@@ -898,7 +914,7 @@ for (k in 1:3){
     if (var == "Da"){
       sel <- selection_bulkd[i]
     }
-    results <- read_rds(str_c("./resultados/modelos/RF_",var,"_",sel,"_results.rds"))
+    results <- read_rds(here("results","models",str_c("RF_",var,"_",sel,"_results.rds")))
     names(results) <- c("bootstrap","validation")
     val.results <- results$validation
     metrics <- lapply(val.results, function(l) l$metrics) %>% rlist::list.rbind(); metrics %>% head()
@@ -934,9 +950,17 @@ for (k in 1:3){
     bound_Mat
     
     
-    p.list[[i]] <- pred.stats %>% filter(depth == depths[i]) %>% dplyr::select(pred.mean, obs, error, depth, fuente) %>% mutate(modelo = paste0("RF-",sel.nam[sel]))
-    m.list[[i]] <- metrics %>% filter(depth == depths[i]) %>% dplyr::select(depth, ME, PBIAS = PBIAS.., RMSE, NRMSE=NRMSE.., r , R2) %>% mutate(modelo = paste0("RF-",sel.nam[sel]))
-    bound.list[[i]] <- bound_Mat %>% filter(depth == depths[i]) %>% mutate(modelo = paste0("RF-",sel.nam[sel]))
+    p.list[[i]] <- pred.stats %>% 
+      filter(depth == depths[i]) %>% 
+      dplyr::select(pred.mean, obs, error, depth) %>%
+      mutate(modelo = paste0("RF-",sel.nam[sel]))
+    m.list[[i]] <- metrics %>%
+      filter(depth == depths[i]) %>%
+      dplyr::select(depth, ME, PBIAS = PBIAS.., RMSE, NRMSE = NRMSE.., r, R2) %>%
+      mutate(modelo = paste0("RF-", sel.nam[sel]))
+    bound.list[[i]] <- bound_Mat %>%
+      filter(depth == depths[i]) %>%
+      mutate(modelo = paste0("RF-", sel.nam[sel]))
     
   }
   
@@ -960,7 +984,7 @@ for (k in 1:3){
   picp <- group.sum/group.tot;picp
   picp %>% dplyr::select(2:11) %>%
     mutate(depth = round(group.sum$depth, digits = 2)) %>%
-    write_csv(paste0("./plots/picp_",var,".csv"))
+    write_csv(here("results","tables",str_c("picp_",var,".csv")))
   
   
   picp <- picp %>% dplyr::select(2:11) %>% mutate(depth = group.sum$depth) %>% 
@@ -1002,10 +1026,17 @@ for (k in 1:3){
   # p2.plot
   
   plot.list[[k]] <- p.plot
+  ggsave(filename = here::here("results", "figures", str_c("PICP_", var,".png")), plot = p.plot, width = 6, height = 5)
+  ggsave(filename = here::here("results", "figures", str_c("PICP_", var,".eps")), plot = p.plot, width = 6, height = 5)
+  
 }
+
 xlay <- rbind(c(1,1,2,2),
              c(4,3,3,4))
-grid.arrange(plot.list[[1]], plot.list[[2]], plot.list[[3]], layout_matrix = lay)
+grid.arrange(plot.list[[1]], plot.list[[2]], plot.list[[3]], layout_matrix = xlay)
+p.plot = arrangeGrob(plot.list[[1]], plot.list[[2]], plot.list[[3]], layout_matrix = xlay)
+ggsave(filename = here::here("results","figures","PICP.png"), width = 9, height = 7, p.plot)
+ggsave(filename = here::here("results","figures","PICP.eps"), width = 9, height = 7, p.plot)
 
 ######################## FIN PARTE 9 #####################
 #####-----------------------------------------------######
@@ -1022,65 +1053,6 @@ var.eng <- c(Da = "Bulk Density", Arcilla = "Clay", Limo = "Silt", arena = "Sand
 sel.nam <- c("upper_uncor" = "U", "lower_uncor" = "L")
 # vector of quantiles
 
-# Extraer predicciones
-get_pred_stats <- function(var, model, predictions){
-  pred.list <- list(rep(NA, 6))
-  for (i in 1:6){
-    # i = 1
-    pred.depth <- predictions %>% filter(depth == depths[i])
-    
-    #calculate mean prediction and residuals
-    n <- pred.depth %>% nrow()/100;n
-    # model = "QRF"
-    if (model == "QRF"){
-      qpred.list <- lapply(1:21, function(j){
-        qpred <- pred.depth[[j]] %>% matrix(nrow = n, byrow = F) %>%
-          as.data.frame() %>%
-          rowMeans()
-      }) %>% rlist::list.cbind() %>% as_tibble
-      names(qpred.list) <- names(pred.depth)[1:21]
-      qpred.list <- qpred.list %>%
-        bind_cols(depth = depths[i], obs = pred.depth$obs[1:n])%>%
-        mutate(error = obs-q0.5);qpred.list
-      pred.list[[i]] <- qpred.list  
-    }
-    if (model == "RF"){
-      pred.means <- pred.depth$predictions %>% matrix(nrow = n, byrow = F) %>%
-        as.data.frame() %>%
-        rowMeans() %>% 
-        bind_cols(pred.depth$obs[1:n]) %>%
-        rename(pred.mean = 1, obs = 2) %>%
-        mutate(error = obs-pred.mean,
-               depth = depths[i])
-      
-      pred.var <- pred.depth$predictions %>% matrix(nrow = n, byrow = F) %>%
-        matrixStats::rowVars() %>%
-        as.data.frame() %>%
-        rename(pred.var = 1)
-      pred.var %>% bind_cols(pred.depth$obs[1:n])
-      
-      pred.list[[i]] <- bind_cols(pred.means, pred.var) %>% dplyr::select(c(2, 1, 5, 3, 4))
-    }
-    
-  }
-  pred.stats <- rlist::list.rbind(pred.list);pred.stats
-  {
-    bd <- read_csv(str_c("./materiales/Database/",var,".csv"))
-    fuentes <-  bd$fuente[match(pred.stats$obs,bd[[5]])]
-    fuentes[fuentes == 1] <- "UChile"
-    fuentes[fuentes == 2] <- "CIREN"
-    fuentes[fuentes == 3] <- "CHLSOC"
-    fuentes[fuentes == 4] <- "WoSIS"
-    fuentes[fuentes == 5] <- "Otros"
-    pred.stats$fuente <- fuentes
-  }
-  pred.stats
-  
-  if (length(which(is.na(pred.stats$fuente))) != 0 ) pred.stats$fuente[which(is.na(pred.stats$fuente))] <- "CIREN"
-  
-  return(pred.stats)
-}
-
 #Selecion de modelos por profundidad
 m.list <- list()
 metrics.plots <- list()
@@ -1088,30 +1060,36 @@ for (k in 1:3){
   var <- variables[k]
   cat("Comenzando con ", var, "\n")
   for (i in 1:6) {
-    if (var == "Arcilla"){
-      sel <- selection_clay[i]
-    }
-    if (var == "arena"){
-      sel <- selection_sand[i]
-    }
-    if (var == "Da"){
-      sel <- selection_bulkd[i]
-    }
-    results <- read_rds(str_c("./resultados/modelos/RF_",var,"_",sel,"_results.rds"))
-    names(results) <- c("bootstrap","validation")
-    val.results <- results$validation
-    metrics <- lapply(val.results, function(l) l$metrics) %>% rlist::list.rbind(); metrics %>% head()
-    predictions <- lapply(val.results, function(l) l$predictions) %>% rlist::list.rbind();predictions
-    
-    m.list[[i]] <- metrics %>% filter(depth == depths[i]) %>% dplyr::select(depth, ME, PBIAS = PBIAS.., RMSE, NRMSE=NRMSE.., r , R2) %>% mutate(modelo = paste0("RF-",sel.nam[sel]))
+  if (var == "Arcilla") {
+    sel <- selection_clay[i]
   }
+  if (var == "arena") {
+    sel <- selection_sand[i]
+  }
+  if (var == "Da") {
+    sel <- selection_bulkd[i]
+  }
+  results <- read_rds(here("results", "models", str_c("RF_", var, "_", sel, "_results.rds")))
+  names(results) <- c("bootstrap", "validation")
+  val.results <- results$validation
+  metrics <- lapply(val.results, function(l) l$metrics) %>% rlist::list.rbind()
+  metrics %>% head()
+  predictions <- lapply(val.results, function(l) l$predictions) %>% rlist::list.rbind()
+  predictions
+
+  m.list[[i]] <- metrics %>%
+    filter(depth == depths[i]) %>%
+    dplyr::select(depth, ME, PBIAS = PBIAS.., RMSE, NRMSE = NRMSE.., r, R2) %>%
+    mutate(modelo = paste0("RF-", sel.nam[sel]))
+}
   
   metrics.stats <- rlist::list.rbind(m.list)
   metrics.stats %>% group_by(depth, modelo) %>% 
     summarise(R2_mean = mean(R2),
               RMSE_mean = mean(RMSE),
               NRMSE_mean = mean(NRMSE),
-              PBIAS_mean = mean(PBIAS)) %>% write_csv(paste0("./plots/", var, "_validations_metrics_mean.csv"))
+              PBIAS_mean = mean(PBIAS)) %>% 
+    write_csv(here("results","tables",paste0(var, "_validations_metrics_mean.csv")))
   
   variable.labels <- c("PBIAS",expression(R^2),"RMSE")
   variable.labels <- c(expression(R^2),"RMSE")
@@ -1122,8 +1100,8 @@ for (k in 1:3){
       mutate(depth = as_factor(depth),
              metric = factor(metric, labels = variable.labels)) %>% 
       ggplot() +
-      geom_violin(aes(x = depth, y = value, color = depth), trim = F, show.legend = F, bw = 0.005) +
-      geom_boxplot(aes(x = depth, y = value, color = depth), show.legend = F, width = 0.1, outlier.alpha = 0)+
+      geom_violin(aes(x = depth, y = value), trim = F, show.legend = F, bw = 0.005) +
+      geom_boxplot(aes(x = depth, y = value), show.legend = F, width = 0.1, outlier.alpha = 0)+
       facet_wrap(~ metric, scales = "free", labeller = "label_parsed") +
       scale_x_discrete(labels = str_sub(depths.nam, start = 1, end = nchar(depths.nam)-3)) +
       theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.text = element_text(size = 12, face = "bold")) +
@@ -1135,8 +1113,8 @@ for (k in 1:3){
       mutate(depth = as_factor(depth),
              metric = factor(metric, labels = variable.labels)) %>% 
       ggplot() +
-      geom_violin(aes(x = depth, y = value, color = depth), trim = F, show.legend = F) +
-      geom_boxplot(aes(x = depth, y = value, color = depth), show.legend = F, width = 0.1, outlier.alpha = 0)+
+      geom_violin(aes(x = depth, y = value), trim = F, show.legend = F) +
+      geom_boxplot(aes(x = depth, y = value), show.legend = F, width = 0.1, outlier.alpha = 0)+
       facet_wrap(~ metric, scales = "free", labeller = "label_parsed") +
       scale_x_discrete(labels = str_sub(depths.nam, start = 1, end = nchar(depths.nam)-3)) +
       theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.text = element_text(size = 12, face = "bold")) +
@@ -1148,8 +1126,8 @@ for (k in 1:3){
       mutate(depth = as_factor(depth),
              metric = factor(metric, labels = variable.labels)) %>% 
       ggplot() +
-      geom_violin(aes(x = depth, y = value, color = depth), trim = F, show.legend = F) +
-      geom_boxplot(aes(x = depth, y = value, color = depth), show.legend = F, width = 0.1, outlier.alpha = 0)+
+      geom_violin(aes(x = depth, y = value), trim = F, show.legend = F) +
+      geom_boxplot(aes(x = depth, y = value), show.legend = F, width = 0.1, outlier.alpha = 0)+
       facet_wrap(~ metric, scales = "free", labeller = "label_parsed") +
       scale_x_discrete(labels = str_sub(depths.nam, start = 1, end = nchar(depths.nam)-3)) +
       theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.text = element_text(size = 12, face = "bold")) +
@@ -1157,6 +1135,9 @@ for (k in 1:3){
     m.plot
   }
   m.plot
+  ggsave(filename = here("results","figures",str_c("METRICS_",var,".png")), height = 5, width = 6, plot = m.plot)
+  ggsave(filename = here("results","figures",str_c("METRICS_",var,".eps")), height = 5, width = 6, plot = m.plot)
+  
   # p2.plot <- picp %>% ggplot(aes(x = quantile, y = q.value)) +
   #   geom_point()+
   #   geom_abline(slope = 1, intercept = 0, color = "red") +
@@ -1171,6 +1152,9 @@ for (k in 1:3){
 lay <- rbind(c(1,1,2,2),
              c(4,3,3,4))
 grid.arrange(metrics.plots[[1]], metrics.plots[[2]], metrics.plots[[3]], layout_matrix = lay)
+m.plot = arrangeGrob(metrics.plots[[1]], metrics.plots[[2]], metrics.plots[[3]], layout_matrix = lay)
+ggsave(filename = here("results","figures","METRICS.png"), height = 7, width = 10, plot = m.plot)
+ggsave(filename = here("results","figures","METRICS.eps"), height = 7, width = 10, plot = m.plot)
 
 
 ######################## FIN PARTE 10 ####################
@@ -1178,8 +1162,8 @@ grid.arrange(metrics.plots[[1]], metrics.plots[[2]], metrics.plots[[3]], layout_
 ############# PARTE 11: MAPAS 5-15, 30-60, 100-200cm Y MAPAS DE SUMPLEMENTO ######################
 
 # cargar mapas de suelo
-dir <- "D:/paper_BDsuelos/Versiones/Version3/post_procesado/100m_v3"
-variables_eng = c("BulkD","Clay","Sand","Silt")
+dir <- here("results","postproc","v1","SoilMaps_MEAN")
+variables_eng = c("Bulkd","Clay","Sand","Silt")
 variables_esp = c("Da","Arcilla","Arena","Limo")
 list.files(dir)
 
@@ -1189,15 +1173,18 @@ depths <- c("5-15","30-60","100-200")
 # Profundidades que van en el suplemento
 depths.sup <- c("0-5","15-30","60-100")
 
+# All depths
+depths.all <- c("0-5","5-15","15-30","30-60","60-100","100-200")
+
 # n = 1
 plot.list <- list()
 for (i in 1:4) {
-  # i = 2
+  # i = 1
   # i=3
   var_eng <- variables_eng[i]
   var_esp <- variables_esp[i]
   files <- list.files(dir, pattern = ".tif$", full.names = T);files
-  files.var <- files[grep(pattern = var_esp, x = files)];files.var
+  files.var <- files[grep(pattern = var_eng, x = files)];files.var
   
   index <- lapply(depths, function(d){grep(pattern = d, files.var)}) %>% unlist;index
   imgs <- stack(files.var[index]);imgs
@@ -1213,8 +1200,8 @@ for (i in 1:4) {
                          just = "left", 
                          x = grid::unit(5, "mm")))
   
-  lvlp <- levelplot(imgs, col.regions = colpal, at = breaks, main = var_title[i], par.settings=my.settings, names.attr = paste0(depths,"cm"));lvlp
-  png(filename = paste0("./plots/",var_eng,"_depths_1.png"), width = 600, height = 800, units = "px")
+  lvlp <- rasterVis::levelplot(imgs, col.regions = colpal, at = breaks, main = var_title[i], par.settings=my.settings, names.attr = paste0(depths,"cm"));lvlp
+  png(filename = here("results","figures", str_c(var_eng,"_depths_1.png")), width = 600, height = 800, units = "px")
   print(lvlp)
   dev.off()
   plot.list[[i]] <- lvlp
@@ -1223,8 +1210,8 @@ plot.list[[4]]
 lay <- rbind(c(1,2),
              c(3,4))
 g <- arrangeGrob(grobs = plot.list, layout_matrix = lay)
-ggsave(plot = g, filename = "./plots/CR2SOILS.png", width = 10, height = 12)
-grid.arrange(grobs = plot.list, layout_matrix = lay)
+ggsave(plot = g, filename = here("results","figures","CR2SOILS_physical_att.png"), width = 10, height = 12)
+# grid.arrange(grobs = plot.list, layout_matrix = lay)
 
 for (i in 1:4) {
   # i = 2
@@ -1233,7 +1220,7 @@ for (i in 1:4) {
   var_esp <- variables_esp[i]
   
   files <- list.files(dir, pattern = ".tif$", full.names = T);files
-  files.var <- files[grep(pattern = var_esp, x = files)];files.var
+  files.var <- files[grep(pattern = var_eng, x = files)];files.var
   
   index <- lapply(depths.sup, function(d){grep(pattern = d, files.var)}) %>% unlist;index
   imgs <- stack(files.var[index]);imgs
@@ -1250,21 +1237,64 @@ for (i in 1:4) {
                          just = "left", 
                          x = grid::unit(5, "mm")))
   
-  lvlp <- levelplot(imgs, col.regions = colpal, at = breaks, main = var_title[i], par.settings=my.settings, names.attr = paste0(depths.sup,"cm"));lvlp
+  lvlp <- rasterVis::levelplot(imgs, col.regions = colpal, at = breaks, main = var_title[i], par.settings=my.settings, names.attr = paste0(depths.sup,"cm"));lvlp
   plot.list[[i]] <- lvlp
-  png(filename = paste0("./plots/",var_eng,"_depths_2.png"), width = 600, height = 800, units = "px")
+  png(filename = here("results","figures", str_c(var_eng,"_depths_2.png")), width = 600, height = 800, units = "px")
   print(lvlp)
   dev.off()
 }
-# lay <- rbind(c(1,1,2,2),
-#              c(4,3,3,4))
-# g <- arrangeGrob(grobs = plot.list, layout_matrix = lay)
-# ggsave(plot = g, filename = "./CR2SOILS_3depths.suplement.png", width = 10, height = 12)
+
+plot.list[[4]]
+lay <- rbind(c(1,2),
+             c(3,4))
+g <- arrangeGrob(grobs = plot.list, layout_matrix = lay)
+ggsave(plot = g, filename = here("results","figures","CR2SOILS_physical_att_suplement.png"), width = 10, height = 12)
 # grid.arrange(grobs = plot.list, layout_matrix = lay)
 
+for (i in 1:4) {
+  # i = 1
+  # i=3
+  var_eng <- variables_eng[i]
+  var_esp <- variables_esp[i]
+  files <- list.files(dir, pattern = ".tif$", full.names = T);files
+  files.var <- files[grep(pattern = var_eng, x = files)];files.var
+  
+  index <- lapply(depths.all, function(d){grep(pattern = d, files.var)}) %>% unlist;index
+  imgs <- stack(files.var[index]);imgs
+  var_title = c("A) Bulk Density", "B) Clay",  "C) Sand", "D) Silt")
+  names(imgs) <- paste0(depths.all,"cm")
+  if (i == 1){breaks = seq(0.1,2.3,0.22)}
+  if (i == 2){breaks = seq(0,70,10)}
+  if (i == 3){breaks = seq(0,100,10)}
+  if (i == 4){breaks = seq(0,90,10)}
+  colpal <- c("#001219","#005F73", "#0A9396", "#94D2BD", "#E9D8A6", "#EE9B00","#CA6702","#BB3E03","#ae2012","#9b2226")
+  my.settings <- list(
+    par.main.text = list(font = 2, # make it bold
+                         just = "left", 
+                         x = grid::unit(5, "mm")))
+  
+  lvlp <- rasterVis::levelplot(imgs, col.regions = colpal, at = breaks, main = var_title[i], par.settings=my.settings, names.attr = paste0(depths.all,"cm"));lvlp
+  png(filename = here("results","figures", str_c(var_eng,"_depths_all.png")), width = 600, height = 800, units = "px")
+  print(lvlp)
+  dev.off()
+  plot.list[[i]] <- lvlp
+}
+
+plot.list[[4]]
+lay <- rbind(c(1,2),
+             c(3,4))
+
+lay <- rbind(c(1),
+             c(2),
+             c(3),
+             c(4))
+g <- arrangeGrob(grobs = plot.list, layout_matrix = lay)
+ggsave(plot = g, filename = here("results","figures","CR2SOILS_physical_att_all.png"), width = 25, height = 35)
+grid.arrange(grobs = plot.list, layout_matrix = lay)
 
 ######################## FIN PARTE 11 ####################
 ############# PARTE 12: PREDICTORES ######################
+
 # Variables globales
 depths.nam <- c("2.5" = "0-5 cm" ,"10" = "5-15 cm", "22.5" = "15-30 cm","45" = "30-60 cm","80" = "60-100 cm","150" = "100-200 cm")
 depths <- c(2.5, 10, 22.5, 45, 80, 150)
@@ -1272,7 +1302,7 @@ var.eng <- c(Da = "Bulk Density", Arcilla = "Clay", Limo = "Silt", arena = "Sand
 variables <- c("Da","Arcilla","arena","Limo")
 
 # tipos de covariables
-cov.type <- read_csv("./materiales/covariables.csv")
+cov.type <- read_csv(here("proc","var_sel","covariables.csv"))
 cov.type
 clase <- factor(cov.type[[2]]);clase
 levels(clase)
@@ -1283,17 +1313,17 @@ names(myColors) <- levels(clase);myColors
 colScale <- scale_fill_manual(name = NULL,values = myColors[-2], limits = levels(clase)[-2], drop = F)
 
 # nombres arreglados de covariables seleccionadas
-cov_names <- read_csv("./resultados/var_select/selected_covs.csv")
+cov_names <- read_csv(here("proc","var_sel","selected_covs.csv"))
 
 plot.list <- list()
-for (i in 1:3) {
+for (i in 2:3) {
   # i = 1
   # seleccionar variable
   var <- variables[i]
   
   #leer variables predictoras upper y lower
-  var_sel_l <- read_rds(str_c("./resultados/var_select/",var,"_lower_uncor.rds"))
-  var_sel_u <- read_rds(str_c("./resultados/var_select/",var,"_upper_uncor.rds"))
+  var_sel_l <- read_rds(here("proc","var_sel",str_c(var,"_lower_uncor.rds")))
+  var_sel_u <- read_rds(here("proc","var_sel",str_c(var,"_upper_uncor.rds")))
   
   #Upper predictors
   predictors <- var_sel_u$pred_names;predictors
@@ -1382,13 +1412,18 @@ for (i in 1:3) {
     theme(legend.position=setLegend(var), plot.title = element_text(hjust = -1))
   arrange <- ggpubr::ggarrange(plot.upper, plot.lower, nrow = 1, ncol = 2, common.legend = T, legend= setLegend(var))
   plot.list[[i]] <- arrange;arrange
-  ggsave(paste0("./plots/selected_covs_",var, "_ultimaversion.png"), arrange, width = 20, height = 10, units = "cm")
-}
+  ggsave(here("results","figures",paste0("selected_covs_",var, ".png")), arrange, width = 20, height = 10, units = "cm")
+  ggsave(here("results","figures",paste0("selected_covs_",var, ".eps")), arrange, width = 20, height = 10, units = "cm")
+  
+  }
 
-arrange <- ggpubr::ggarrange(plotlist = plot.list, nrow = 3, ncol = 1, labels = list("A) Bulk Density","B) Clay","C) Sand"),
+arrange <- ggpubr::ggarrange(plotlist = plot.list, nrow = 3, ncol = 1, 
+                             labels = list("A) Bulk Density","B) Clay","C) Sand"),
                              common.legend = TRUE, legend="bottom",
                              hjust = c(0.008,0,0));arrange
-ggsave(paste0("./plots/selected_covs_ultimaversion.png"), arrange, width = 20, height = 20, units = "cm")
+ggsave(here("results","figures","selected_covs.png"), arrange, width = 20, height = 20, units = "cm")
+ggsave(here("results","figures","selected_covs.eps"), arrange, width = 20, height = 20, units = "cm")
+
 
 ######################## FIN PARTE 12 ####################
 #####-----------------------------------------------######
@@ -1398,52 +1433,58 @@ depths.nam <- c("2.5" = "0-5 cm" ,"10" = "5-15 cm", "22.5" = "15-30 cm","45" = "
 depths <- c(2.5, 10, 22.5, 45, 80, 150)
 var.eng <- c(Da = "Bulk Density", Arcilla = "Clay", Limo = "Silt", arena = "Sand")
 variables <- c("Da","Arcilla","arena","Limo")
-outdir <- "D:/paper_BDsuelos/Versiones/Version3/post_procesado"
-# mapas post-procesados
-files<- list.files("D:/paper_BDsuelos/Versiones/Version3/post_procesado/100m_v3", full.names = TRUE, pattern = ".tif")
-clay.f <- files[grep("Arcilla", files)];clay.f
-sand.f <- files[grep("Arena", files)]
-silt.f <- files[grep("Limo", files)]
-bulkd.f <- files[grep("Da", files)]
+outdir <- here("results","tables")
 
-img <- rast(bulkd.f)
-img <- img[[c(1,5,3,4,6,2)]]
-val.img <- values(img)
-val.summary = val.img %>% as_tibble %>% drop_na %>% pivot_longer(cols = 1:6) %>% 
-  group_by(name) %>% 
-  summarise(mean = mean(value),
-            median = median(value),
-            sd = sd(value), 
-            max = max(value),
-            min = min(value),
-            iqr = IQR(value),
-            q0.25 = quantile(value, 0.25),
-            q0.75 = quantile(value, 0.75)
-            )
-val.summary %>% write_csv(paste0(outdir, "/Bulkdensity_summary.csv"))
+# mapas post-procesados
+files<- list.files(here("results","postproc","v1","SoilMaps_MEAN"), full.names = TRUE, pattern = ".tif")
+variables = c("Clay","Sand","Silt","Bulkd")
+for (i in 1:4){
+  var = variables[i]
+  print(var)
+  
+  x.f <- files[grep(var, files)]
+  img <- rast(x.f)
+  img <- img[[c(1,5,3,4,6,2)]]
+  val.img <- values(img)
+  val.summary = val.img %>% as_tibble %>% drop_na %>% pivot_longer(cols = 1:6) %>% 
+    group_by(name) %>% 
+    summarise(mean = mean(value),
+              median = median(value),
+              sd = sd(value), 
+              max = max(value),
+              min = min(value),
+              iqr = IQR(value),
+              q0.25 = quantile(value, 0.25),
+              q0.75 = quantile(value, 0.75)
+    )
+  val.summary %>% write_csv(here(outdir, str_c(var, "_density_summary.csv")))
+}
+
 ######################## FIN PARTE 13 ####################
 #####-----------------------------------------------######
 ############# PARTE 14: PLOTS UNCERTAINTY VS PREDICTED VALUES ######################
 # Variables globales
 depths.nam <- c("2.5" = "0-5cm" ,"10" = "5-15cm", "22.5" = "15-30cm","45" = "30-60cm","80" = "60-100cm","150" = "100-200cm")
 depths <- c(2.5, 10, 22.5, 45, 80, 150)
-var.eng <- c(Da = "Bulk Density", Arcilla = "Clay", Limo = "Silt", arena = "Sand")
-variables <- c("Da","Arcilla","Arena","Limo")
-outdir <- "D:/paper_BDsuelos/Versiones/Version3/post_procesado"
+variables <- c("Bulkd","Clay","Sand","Silt")
+var.eng <- c("Bulk Density", "Clay", "Sand","Silt")
+
+outdir <- here("results","figures")
 
 p.list <- list()
-for (i in 1:2){
+for (i in 2:3){
   # i=1
   var <- variables[i]
+  print(var)
   # mapas post-procesados PIRANGE
-  files <- list.files(paste0("D:/paper_BDsuelos/Versiones/Version3/post_procesado/100m_v3/",var, "_Limits"), full.names = TRUE, pattern = ".tif")
-  pir.files <- files[grep("[0-9]_PIRange", files)];pir.files
-  
+  files <- list.files(here("results","postproc","v1","PIRange"),
+                           full.names = TRUE, pattern = ".tif");pir.files
+  pir.files <- files[grep(var, files)][c(1,5,3,4,6,2)];pir.files
   # mapas post-procesados MEAN PREDICTION
-  files<- list.files("D:/paper_BDsuelos/Versiones/Version3/post_procesado/100m_v3", full.names = TRUE, pattern = ".tif")
-  mean.files <- files[grep(var, files)];mean.files
+  files<- list.files(here("results","postproc","v1","SoilMaps_MEAN"), full.names = TRUE, pattern = ".tif")
+  mean.files <- files[grep(var, files)][c(1,5,3,4,6,2)];mean.files
   
-  imgs <- c(pir.files[c(3,1,4,5,6,2)], mean.files[c(1,5,3,4,6,2)]) %>% rast
+  imgs <- c(pir.files, mean.files) %>% rast
   names(imgs)
   names(imgs)[1:6] <- paste0(var,".", depths.nam,"_PI")
   samp.df <- spatSample(imgs, size = 100000, method = "random", na.rm = TRUE, as.df = TRUE)
@@ -1455,7 +1496,9 @@ for (i in 1:2){
   m <- samp.df %>% dplyr::select(-ends_with("PI")) %>% 
     pivot_longer(cols = 1:6, names_to = "depth",values_to = "mean")
   
-  str_split(samp.df$depth[1:100], pattern = "\\.") %>% sapply(FUN = function(x){x[[2]]}) %>% factor(levels = c("0-5cm","5-15cm","15-30cm","30-60cm","60-100cm","100-200cm"))
+  str_split(samp.df$depth[1:100], pattern = "\\.") %>% 
+    sapply(FUN = function(x){x[[2]]}) %>% 
+    factor(levels = c("0-5cm","5-15cm","15-30cm","30-60cm","60-100cm","100-200cm"))
   
   samp.df <- m %>% bind_cols(pi)
   # rm(m);rm(pi)
@@ -1463,10 +1506,6 @@ for (i in 1:2){
                                   sapply(FUN = function(x){x[[2]]}) %>% 
                                   factor(levels = c("0-5cm","5-15cm","15-30cm","30-60cm","60-100cm","100-200cm"))
   )
-  # p <- ggplot(samp.df)+
-  #   geom_hex(aes(x = mean, y = PI))+
-  #   facet_wrap(.~depth)
-  # print(p)
   samp.df
   
   p <- ggplot(samp.df, aes(x = mean, y = PI))+
@@ -1474,23 +1513,87 @@ for (i in 1:2){
     geom_smooth(method = "lm")+
     # ggpubr::stat_cor()+
     # scale_fill_gradient(low = "yellow" , high = "red", space = "Lab")+
-    labs(x = var.eng[[if_else(var == "Arena", "arena", var)]], y = "Prediction Interval width")+
+    labs(x = if_else(var == "Bulkd", "Bulk density", var), y = "Prediction Interval width")+
     theme_bw()+
     scale_color_viridis()+
     theme(axis.title = element_text(size = 16))
-  print(p)
   p.list[[i]] <- p
-  ggsave(filename = paste0("./plots/", var,"_PI_vs_mean_points_density.png"), width = 4, height = 4)
+  ggsave(filename = here(outdir,str_c(var,"_PI_vs_mean_points_density.png")), width = 4, height = 4)
+  ggsave(filename = here(outdir,str_c(var,"_PI_vs_mean_points_density.eps")), width = 4, height = 4)
   
 }
-# beepr::beep(sound = 4)
-p.list[[3]]
-beepr::beep(sound = 5)
-getwd()
-val.summary %>% write_csv(paste0(outdir, "/Bulkdensity_summary.csv"))
 ######################## FIN PARTE 14 ####################
 #####-----------------------------------------------######
 
+############# PARTE 15: FC AND PWP VALIDATION ######################
+# depths levels
+depths <- c("0-5 cm", "5-15 cm", "15-30 cm", "30-60 cm", "60-100 cm", "100-200 cm")
+
+# Load Dataframe with observed and simulated values
+# Field Capacity
+fname <- here("proc", "correlations", "FC_correlation.csv")
+data <- read_csv(fname) %>%
+  mutate(depth = factor(depth, levels = depths))
+
+# calculate metrics
+annotate_metrics <- function(sim, obs) {
+  m <- hydroGOF::gof(sim, obs, norm = "maxmin")
+  msg <- paste0("R2 = ", m["R2", ], "\nRMSE = ", m["RMSE", ], "\nNRMSE = ", m["NRMSE %", ], "%", "\nPBIAS = ", m["PBIAS %", ], "%")
+  as.character(msg)
+}
+metrics <- data %>%
+  group_by(depth) %>%
+  do(data.frame(message = annotate_metrics(.$sim, .$obs)))
+metrics
+
+# set default theme
+theme_set(theme_bw())
+p1 <- ggplot(data, aes(x = obs, y = sim)) +
+  geom_point(alpha = 0.7, size = 0.7) +
+  geom_label(data = metrics, aes(label = message), x = 0.3, y = 0.75, size = 2) +
+  geom_smooth(method = "lm", se = T) +
+  geom_abline(slope = 1, intercept = 0) +
+  tune::coord_obs_pred() +
+  labs(x = "observed", y = "simulated", title = "A) Field Capacity") +
+  facet_wrap(depth ~ .)
+plot(p1)
+ggsave(filename = here("results", "figures", "FC_correlation_R2.png"), width = 7, height = 5, plot = p1)
+ggsave(filename = here("results", "figures", "FC_correlation_R2.eps"), width = 7, height = 5, plot = p1)
+
+# Permanent Wilting Point
+fname <- here("proc", "correlations", "PWP_correlation.csv")
+data <- read_csv(fname) %>%
+  mutate(depth = factor(depth, levels = depths))
+
+metrics <- data %>%
+  group_by(depth) %>%
+  do(data.frame(message = annotate_metrics(.$sim, .$obs)))
+
+# set default theme
+theme_set(theme_bw())
+p2 <- ggplot(data, aes(x = obs, y = sim)) +
+  geom_point(alpha = 0.7, size = 0.7) +
+  geom_label(data = metrics, aes(label = message), x = 0.15, y = 0.44, size = 2) +
+  geom_smooth(method = "lm", se = T) +
+  geom_abline(slope = 1, intercept = 0) +
+  tune::coord_obs_pred() +
+  labs(x = "observed", y = "simulated", title = "B) Permanent Wilting Point") +
+  facet_wrap(depth ~ .)
+plot(p2)
+ggsave(filename = here("results", "figures", "PWP_correlation_R2.png"), width = 7, height = 5, plot = p2)
+ggsave(filename = here("results", "figures", "PWP_correlation_R2.eps"), width = 7, height = 5, plot = p2)
+
+arrange <- ggpubr::ggarrange(
+  plotlist = list(p1, p2), nrow = 2, ncol = 1,
+  hjust = c(0.008, 0, 0)
+)
+
+arrange
+ggsave(filename = here("results", "figures", "PWPandFC_correlation.png"), width = 7, height = 9)
+ggsave(filename = here("results", "figures", "PWPandFC_correlation.eps"), width = 12, height = 6)
+
+######################## FIN PARTE 15 ####################
+#####-----------------------------------------------######
 
 
 
