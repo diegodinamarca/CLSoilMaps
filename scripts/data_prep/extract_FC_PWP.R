@@ -51,6 +51,8 @@
   conflicted::conflict_prefer("filter", "dplyr")
   conflicted::conflict_prefer("extract", "terra")
   conflicted::conflict_prefer("rename","dplyr")
+    conflicted::conflict_prefer("rename","dplyr")
+
 
   # LOAD FUNCTIONS ------------------------------------
   # space reserved for your functions
@@ -70,7 +72,7 @@ fname = here("proc","soil_database","standard","FC_standard.csv")
 soil_db = read_csv(fname) %>% filter(id != 2108)
 depths = names(soil_db)[2:7]
 
-scico_palette_show()
+
 # DATABASE 
 x = soil_db %>% pivot_longer(cols = 2:7, names_to = "depth") %>% 
   mutate(depth = factor(depth, levels = depths))
@@ -103,7 +105,7 @@ fname = here("proc","soil_database","standard","PWP_standard.csv")
 soil_db = read_csv(fname) %>% filter(id != 2108)
 depths = names(soil_db)[2:7]
 
-scico_palette_show()
+
 # DATABASE 
 x = soil_db %>% pivot_longer(cols = 2:7, names_to = "depth") %>% 
   mutate(depth = factor(depth, levels = depths))

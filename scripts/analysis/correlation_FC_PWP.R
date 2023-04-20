@@ -52,14 +52,13 @@
 
 
 # Load Dataframe with observed and simulated values -----------------------
+# depths levels
+depths <- c('0-5 cm','5-15 cm','15-30 cm', "30-60 cm","60-100 cm","100-200 cm")
 
 # Field Capacity
 fname = here("proc","correlations","FC_correlation.csv")
 data = read_csv(fname) %>% 
   mutate(depth = factor(depth, levels = depths))
-
-# depths levels
-depths <- c('0-5 cm','5-15 cm','15-30 cm', "30-60 cm","60-100 cm","100-200 cm")
 
 # calculate metrics
 annotate_metrics = function(sim, obs) {
@@ -80,16 +79,13 @@ p = ggplot(data, aes(x = obs, y = sim))+
   labs(x = "observed", y = "simulated", title = "Field Capacity")+
   facet_wrap(depth~.)
 plot(p)
-ggsave(filename = here("results","figures","FC_correlation_r.png"), width = 7, height = 5, plot = p)
+ggsave(filename = here("results","figures","FC_correlation_r2.png"), width = 7, height = 5, plot = p)
 
 
 # Permanent Wilting Point
 fname = here("proc","correlations","PWP_correlation.csv")
 data = read_csv(fname) %>% 
   mutate(depth = factor(depth, levels = depths))
-
-# depths levels
-depths <- c('0-5 cm','5-15 cm','15-30 cm', "30-60 cm","60-100 cm","100-200 cm")
 
 metrics = data %>% group_by(depth) %>% do(data.frame(message = annotate_metrics(.$sim, .$obs)))
 
@@ -104,4 +100,6 @@ p = ggplot(data, aes(x = obs, y = sim))+
   labs(x = "observed", y = "simulated", title = "Permanent Wilting Point")+
   facet_wrap(depth~.)
 plot(p)
-ggsave(filename = here("results","figures","PWP_correlation_R.png"), width = 7, height = 5, plot = p)
+ggsave(filename = here("results","figures","PWP_correlation_r2.png"), width = 7, height = 5, plot = p)
+
+

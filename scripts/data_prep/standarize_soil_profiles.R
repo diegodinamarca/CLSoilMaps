@@ -81,20 +81,25 @@ stand_soilatt = function(obs.data, var, lambda, vlow = 0, vhigh = 1){
 
 # Load database
 soilprofiles_data <- read_csv(here("data","soil_database","BD_soilprof_26ENE.csv"))
+soilprofiles_data <- read_csv("D:/Soilprofile_database/data/soilprofiles_db.csv")
 names(soilprofiles_data)
 
 
 db = soilprofiles_data %>%
   filter(Tratamiento == "testigo") %>% 
   select(ID, x, y, top, bottom, bulkd = Da, clay = A, silt = L, sand = a, OM = MO, FC = CC, PWP = PMP)
+db
+db = soilprofiles_data %>%
+  filter(Tratamiento == "testigo") %>% 
+  select(ID, x, y, top, bottom, bulkd = Da, clay = Arcilla, silt = Limo, sand = arena, OM = MO, FC = CC, PWP = PMP)
 
 # Remove problematic data
 id.rm = c(2108)
 # variables to process
 variables <- c("bulkd","clay","sand","silt","OM", "FC","PWP")
 # l <- c(0.1, 0.001,0.001, 0.001, 0.001)
-l <- 0.0001
-for (i in 6:7){
+l <- 0.00001
+for (i in 1:4){
   #iterate through databases
   # i=1
   var <- variables[i]
@@ -110,7 +115,7 @@ for (i in 6:7){
   }else{
     vhigh = 100
   }
-  eaFit = stand_soilatt(db, var, l, vlow = 0, vhigh = 1)
+  eaFit = stand_soilatt(db, var, l, vlow = 0, vhigh = vhigh)
   
   # Export Harmonized database
   harm <- eaFit$harmonised
