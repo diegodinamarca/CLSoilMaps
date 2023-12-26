@@ -90,80 +90,129 @@ eco_names = c("Atacama desert",
               "Valdivian temperate forests",
               "Patagonian steppe", 
               "Magellanic subpolar forests")
+eco_names_ab = c("AD",
+              "CADP",
+              "SAS",
+              "CM",
+              "VTF",
+              "PS", 
+              "MSF")
+names(eco_names_ab) = eco_names
 
 dataset = dataset %>% 
-  mutate(eco_name = factor(eco_name, levels = eco_names))
+  mutate(eco_name = factor(eco_name, levels = eco_names),
+         eco_name_ab = factor(eco_names_ab[eco_name],levels = eco_names_ab))
+dataset
+count_data = count(drop_na(dataset), eco_name_ab, var)
+count_data
+
+dataset %>% 
+  group_by(var, eco_name_ab) %>% 
+  summarise(sim = sum(!is.na(value_sim))) %>% 
+  print(n = 28)
 
 
-theme_bw()
+names(variables) = c("Bulk Density","Clay","Sand","Silt")
+theme_set(theme_bw())
 for (i in 1:4) {
   # i=1
-  if (variables[i] == "Bulkd"){
-    p = dataset %>% filter(var == variables[i]) %>% 
-      ggplot()+
-      geom_density(aes(x = value_sim, color = "CLSoilMaps"), 
-                   linewidth = 0.8)+
-      geom_density(aes(x = value_sg, color = "SoilGrids"), 
-                   linewidth = 0.8)+
-      geom_density(aes(x = value_obs, color = "Observed"), 
-                   linewidth = 0.8,
-                   linetype = "dashed")+
-      facet_wrap(.~eco_name, scales = "free",ncol = 1)+
-      scale_color_manual(values = c( "#D55E00","#000000","#0072B2"),
-                         labels = c("CLSoilMaps","Oberved","SoilGrids"))+
-      labs(x = "", color = "", title = "Bulk Density")+
-      theme(plot.title = element_text(hjust = 0.5, size = 24, face = "bold"),
-            strip.text = element_text(size = 20),
-            axis.title = element_text(size = 20),
-            legend.position = "bottom",
-            legend.text = element_text(size = 17.5))
-  }else if(variables[i] == "Silt"){
-    p = dataset %>% filter(var == variables[i]) %>% 
-      ggplot()+
-      geom_density(aes(x = value_sim, color = "CLSoilMaps"), 
-                   linewidth = 0.8)+
-      geom_density(aes(x = value_sg, color = "SoilGrids"), 
-                   linewidth = 0.8)+
-      geom_density(aes(x = value_obs, color = "Observed"), 
-                   linewidth = 0.8,
-                   linetype = "dashed")+
-      facet_wrap(.~eco_name, scales = "free",ncol = 1)+
-      scale_color_manual(values = c( "#D55E00","#000000","#0072B2"),
-                         labels = c("CLSoilMaps","Oberved","SoilGrids"))+
-      labs(x = "", color = "", title = "Silt")+
-      theme(plot.title = element_text(hjust = 0.5, size = 24, face = "bold"),
-            strip.text = element_text(size = 20),
-            axis.title = element_text(size = 20),
-            legend.position = "bottom",
-            legend.text = element_text(size = 17.5))
-  }else{
-    p = dataset %>% filter(var == variables[i]) %>% 
-      ggplot()+
-      geom_density(aes(x = value_sim, color = "CLSoilMaps"), 
-                   linewidth = 0.8)+
-      geom_density(aes(x = value_sg, color = "SoilGrids"), 
-                   linewidth = 0.8)+
-      geom_density(aes(x = value_obs, color = "Observed"), 
-                   linewidth = 0.8,
-                   linetype = "dashed")+
-      facet_wrap(.~eco_name, scales = "free",ncol = 1)+
-      scale_color_manual(values = c( "#D55E00","#000000","#0072B2"),
-                         labels = c("CLSoilMaps","Oberved","SoilGrids"))+
-      labs(x = "", color = "", title = variables[i])+
-      theme(plot.title = element_text(hjust = 0.5, size = 24, face = "bold"),
-            strip.text = element_text(size = 20),
-            axis.title = element_text(size = 20),
-            legend.position = "bottom",
-            legend.text = element_text(size = 17.5))
+  {
+    # if (variables[i] == "Bulkd"){
+    #   p = dataset %>% filter(var == variables[i]) %>% 
+    #     ggplot()+
+    #     geom_density(aes(x = value_obs, color = "Observed"), 
+    #                  linewidth = 0.8)+
+    #     geom_density(aes(x = value_sim, color = "CLSoilMaps"), 
+    #                  linewidth = 0.8)+
+    #     geom_density(aes(x = value_sg, color = "SoilGrids"), 
+    #                  linewidth = 0.8)+
+    #     geom_text(data = count_data %>% filter(var == variables[i]),
+    #               aes(x = Inf, y = Inf, label = str_c("N = ",n)),
+    #               hjust = 1.2, vjust = 1.2)+
+    #     facet_wrap(.~eco_name_ab, scales = "free",ncol = 1)+
+    #     scale_color_manual(values = c( "#D55E00","#000000","#0072B2"),
+    #                        labels = c("CLSoilMaps","Observed","SoilGrids"))+
+    #     labs(x = "", color = "", title = "Bulk Density")+
+    #     theme(plot.title = element_text(hjust = 0.5, size = 24, face = "bold"),
+    #           strip.text = element_text(size = 20),
+    #           axis.title = element_text(size = 20),
+    #           legend.position = "bottom",
+    #           legend.text = element_text(size = 17.5))
+    # }else if(variables[i] == "Silt"){
+    #   p = dataset %>% filter(var == variables[i]) %>% 
+    #     ggplot()+
+    #     geom_density(aes(x = value_obs, color = "Observed"), 
+    #                  linewidth = 0.8)+
+    #     geom_density(aes(x = value_sim, color = "CLSoilMaps"), 
+    #                  linewidth = 0.8)+
+    #     geom_density(aes(x = value_sg, color = "SoilGrids"), 
+    #                  linewidth = 0.8)+
+    #     geom_text(data = count_data %>% filter(var == variables[i]),
+    #               aes(x = Inf, y = Inf, label = str_c("N = ",n)),
+    #               hjust = 1.2, vjust = 1.2, size = 20)+
+    #     facet_wrap(.~eco_name_ab, scales = "free",ncol = 1)+
+    #     scale_color_manual(values = c( "#D55E00","#000000","#0072B2"),
+    #                        labels = c("CLSoilMaps","Observed","SoilGrids"))+
+    #     labs(x = "", color = "", title = "Silt")+
+    #     theme(plot.title = element_text(hjust = 0.5, size = 24, face = "bold"),
+    #           strip.text = element_text(size = 20),
+    #           axis.title = element_text(size = 20),
+    #           axis.text = element_text(size = 18),
+    #           legend.position = "bottom",
+    #           legend.text = element_text(size = 17.5))
+    # }else{
+    #   p = dataset %>% filter(var == variables[i]) %>% 
+    #     ggplot()+
+    #     geom_density(aes(x = value_obs, color = "Observed"), 
+    #                  linewidth = 0.8)+
+    #     geom_density(aes(x = value_sim, color = "CLSoilMaps"), 
+    #                  linewidth = 0.8)+
+    #     geom_density(aes(x = value_sg, color = "SoilGrids"), 
+    #                  linewidth = 0.8)+
+    #     geom_text(data = count_data %>% filter(var == variables[i]),
+    #               aes(x = Inf, y = Inf, label = str_c("N = ",n)),
+    #               hjust = 1.2, vjust = 1.2)+
+    #     facet_wrap(.~eco_name_ab, scales = "free",ncol = 1)+
+    #     scale_color_manual(values = c( "#D55E00","#000000","#0072B2"),
+    #                        labels = c("CLSoilMaps","Observed","SoilGrids"))+
+    #     labs(x = "", color = "", title = variables[i])+
+    #     theme(plot.title = element_text(hjust = 0.5, size = 24, face = "bold"),
+    #           strip.text = element_text(size = 20),
+    #           axis.title = element_text(size = 20),
+    #           legend.position = "bottom",
+    #           legend.text = element_text(size = 17.5))
+    #   
+    #   
+    # }
   }
-  plot(p)
-  ggsave(plot = p, here("results","figures",paste0("ecoregion_distribution_",variables[i], ".png")), height = 17, width = 5)
-  ggsave(plot = p, here("results","figures",paste0("ecoregion_distribution_",variables[i], ".pdf")), height = 17, width = 5)
-  ggsave(plot = p, here("results","figures",paste0("ecoregion_distribution_",variables[i], ".svg")), height = 17, width = 5)
+  
+  p = dataset %>% filter(var == variables[i]) %>% 
+    ggplot()+
+    geom_density(aes(x = value_obs, color = "Observed"), 
+                 linewidth = 0.8, linetype = "dashed")+
+    geom_density(aes(x = value_sim, color = "CLSoilMaps"), 
+                 linewidth = 0.8)+
+    geom_density(aes(x = value_sg, color = "SoilGrids"), 
+                 linewidth = 0.8)+
+    geom_text(data = count_data %>% filter(var == variables[i]),
+              aes(x = Inf, y = Inf, label = str_c("N = ",n)),
+              hjust = 1.2, vjust = 1.2, size = 6)+
+    facet_wrap(.~eco_name_ab, scales = "free",ncol = 1)+
+    scale_color_manual(values = c( "#D55E00","#000000","#0072B2"),
+                       labels = c("CLSoilMaps","Observed","SoilGrids"))+
+    labs(x = "", color = "", title = names(variables)[i])+
+    theme(plot.title = element_text(hjust = 0.5, size = 28, face = "bold"),
+          strip.text = element_text(size = 18),
+          axis.title = element_blank(),
+          axis.text = element_text(size = 13),
+          legend.position = "bottom",
+          legend.text = element_text(size = 24))
+  # plot(p)
+  ggsave(plot = p, here("results","figures",paste0("ecoregion_distribution_",variables[i], ".png")), height = 12, width = 4)
+  ggsave(plot = p, here("results","figures",paste0("ecoregion_distribution_",variables[i], ".pdf")), height = 12, width = 4)
+  ggsave(plot = p, here("results","figures",paste0("ecoregion_distribution_",variables[i], ".svg")), height = 12, width = 4)
 }
 
-facet_wrap()
-theme_bw()
 plot(eco)
 eco$ECO_NAME = factor(eco$ECO_NAME, levels = eco_names)
 ggplot(eco)+
@@ -171,9 +220,9 @@ ggplot(eco)+
   labs(fill = "Ecoregion")+
   scale_fill_manual(values = okabe)
   # scico::scale_fill_scico_d(palette = "batlow")
-ggsave(here("results","figures",paste0("ecoregions.png")), height = 11, width = 4)
-ggsave(here("results","figures",paste0("ecoregions.pdf")), height = 11, width = 4)
-ggsave(here("results","figures",paste0("ecoregions.svg")), height = 11, width = 4)
+ggsave(here("results","figures",paste0("ecoregions.png")), height = 10, width = 3)
+ggsave(here("results","figures",paste0("ecoregions.pdf")), height = 10, width = 3)
+ggsave(here("results","figures",paste0("ecoregions.svg")), height = 10, width = 3)
 
 
 # standardized soilprofiles

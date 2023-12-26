@@ -1,82 +1,83 @@
-# HEADER --------------------------------------------
-#
-# Author: Diego Dinamarca
-# Email:  ddinamarcamuller@gmail.com
-# 
-# Date:
-#
-# Script Name:
-#
-# Script Description: 
-#
-# Notes:
-#
-#
-# INSTALL PACKAGES & LOAD LIBRARIES -----------------
-cat("INSTALLING PACKAGES & LOADING LIBRARIES... \n\n", sep = "")
-packages <- c("tidyverse",
-              "terra", 
-              "sf",
-              "here") # list of packages to load
-n_packages <- length(packages) # count how many packages are required
-
-new.pkg <- packages[!(packages %in% installed.packages())] # determine which packages aren't installed
-
-# install missing packages
-if(length(new.pkg)){
-  install.packages(new.pkg)
-}
-
-# load all requried libraries
-for(n in 1:n_packages){
-  cat("Loading Library #", n, " of ", n_packages, "... Currently Loading: ", packages[n], "\n", sep = "")
-  lib_load <- paste("library(\"",packages[n],"\")", sep = "") # create string of text for loading each library
-  eval(parse(text = lib_load)) # evaluate the string to load the library
-}
-# SET WORKING DIRECTORY -----------------------------
-cat("SETTING WORKING DIRECTORY...\n\n", sep = "")
-wd <- here::here()
-setwd(wd)
-cat("WORKING DIRECTORY HAS BEEN SET TO: ", wd, sep = "")
-
-# SET OPTIONS ---------------------------------------
-cat("SETTING OPTIONS... \n\n", sep = "")
-options(scipen = 999) # turns off scientific notation
-options(encoding = "UTF-8") # sets string encoding to UTF-8 instead of ANSI
-
-
-conflicted::conflict_prefer("select", winner = "dplyr")
-conflicted::conflict_prefer("filter", winner = "dplyr") 
-# LOAD FUNCTIONS ------------------------------------
-stand_soilatt = function(obs.data, var, lambda, vlow = 0, vhigh = 1){
-  require(aqp)
-  require(ithir)
-  #Define SoilProfile database
-  depths(obs.data) = ID ~ top + bottom
+{
+  # HEADER --------------------------------------------
+  #
+  # Author: Diego Dinamarca
+  # Email:  ddinamarcamuller@gmail.com
+  # 
+  # Date:
+  #
+  # Script Name:
+  #
+  # Script Description: 
+  #
+  # Notes:
+  #
+  #
+  # INSTALL PACKAGES & LOAD LIBRARIES -----------------
+  cat("INSTALLING PACKAGES & LOADING LIBRARIES... \n\n", sep = "")
+  packages <- c("tidyverse",
+                "terra", 
+                "sf",
+                "here") # list of packages to load
+  n_packages <- length(packages) # count how many packages are required
   
-  #smoothing parameter
-  lambda.l <- c(10, 1, 0.1, 0.01, 0.001,0.0001,0.00001)
+  new.pkg <- packages[!(packages %in% installed.packages())] # determine which packages aren't installed
   
-  #GET RMSE for each lambda
-  rmse_models <- sapply(lambda.l, function(x){
-    tryCatch({
-      # x <- 10
-      eaFit <- ea_spline(obs.data, var.name = var, #CAMBIAR COLUMNA SEGUN PROPIEDAD
-                         d = t(c(0, 5, 15, 30, 60, 100, 200)), lam = x, vlow = vlow, vhigh = vhigh,
-                         show.progress = TRUE)
-      print(paste0("lambda: ",x, " RMSE: ",round(eaFit$splineFitError$rmse %>% mean,3)))},
-      error = function(w){
-        print(paste0("Error fitting splines for lambda = ", x))
-        res <- 9999
-      })
-  })
-  # Get final results
-  eaFit <- ea_spline(obs.data, var.name = var,
-                     d = t(c(0, 5, 15, 30, 60, 100, 200)), lam = lambda, vlow = vlow, vhigh = vhigh,
-                     show.progress = F)
-  return(eaFit)
+  # install missing packages
+  if(length(new.pkg)){
+    install.packages(new.pkg)
+  }
+  
+  # load all requried libraries
+  for(n in 1:n_packages){
+    cat("Loading Library #", n, " of ", n_packages, "... Currently Loading: ", packages[n], "\n", sep = "")
+    lib_load <- paste("library(\"",packages[n],"\")", sep = "") # create string of text for loading each library
+    eval(parse(text = lib_load)) # evaluate the string to load the library
+  }
+  # SET WORKING DIRECTORY -----------------------------
+  cat("SETTING WORKING DIRECTORY...\n\n", sep = "")
+  wd <- here::here()
+  setwd(wd)
+  cat("WORKING DIRECTORY HAS BEEN SET TO: ", wd, sep = "")
+  
+  # SET OPTIONS ---------------------------------------
+  cat("SETTING OPTIONS... \n\n", sep = "")
+  options(scipen = 999) # turns off scientific notation
+  options(encoding = "UTF-8") # sets string encoding to UTF-8 instead of ANSI
+  
+  
+  conflicted::conflict_prefer("select", winner = "dplyr")
+  conflicted::conflict_prefer("filter", winner = "dplyr") 
+  # LOAD FUNCTIONS ------------------------------------
+  stand_soilatt = function(obs.data, var, lambda, vlow = 0, vhigh = 1){
+    require(aqp)
+    require(ithir)
+    #Define SoilProfile database
+    depths(obs.data) = ID ~ top + bottom
+    
+    #smoothing parameter
+    lambda.l <- c(10, 1, 0.1, 0.01, 0.001,0.0001,0.00001)
+    
+    #GET RMSE for each lambda
+    rmse_models <- sapply(lambda.l, function(x){
+      tryCatch({
+        # x <- 10
+        eaFit <- ea_spline(obs.data, var.name = var, #CAMBIAR COLUMNA SEGUN PROPIEDAD
+                           d = t(c(0, 5, 15, 30, 60, 100, 200)), lam = x, vlow = vlow, vhigh = vhigh,
+                           show.progress = TRUE)
+        print(paste0("lambda: ",x, " RMSE: ",round(eaFit$splineFitError$rmse %>% mean,3)))},
+        error = function(w){
+          print(paste0("Error fitting splines for lambda = ", x))
+          res <- 9999
+        })
+    })
+    # Get final results
+    eaFit <- ea_spline(obs.data, var.name = var,
+                       d = t(c(0, 5, 15, 30, 60, 100, 200)), lam = lambda, vlow = vlow, vhigh = vhigh,
+                       show.progress = F)
+    return(eaFit)
+  }
 }
-
 # space reserved for your functions
 
 # Load database
@@ -93,24 +94,31 @@ db = soilprofiles_data %>%
   filter(Tratamiento == "testigo") %>% 
   select(ID, x, y, top, bottom, bulkd = Da, clay = Arcilla, silt = Limo, sand = arena, OM = MO, FC = CC, PWP = PMP)
 
+db$HA = db$FC-db$PWP
 # Remove problematic data
 id.rm = c(2108)
 # variables to process
-variables <- c("bulkd","clay","sand","silt","OM", "FC","PWP")
+variables <- c("HA","bulkd","clay","sand","silt","OM", "FC","PWP")
 # l <- c(0.1, 0.001,0.001, 0.001, 0.001)
 l <- 0.00001
-for (i in 1:4){
+
+for (i in 1:1){
   #iterate through databases
   # i=1
   var <- variables[i]
   print(var)
   # clean non valid records
-  db = db[which(db[[var]] != -999),]
+  if (var == "HA"){
+    db = db[which(db[[var]] != 0),]
+    
+  }else{
+    db = db[which(db[[var]] != -999),]
+  }
   #Define SoilProfile database
   if (var == "bulkd"){
     vhigh = 2.5
-  }else if( var == "FC" || var == "PWP"){
-    print("FC|PWP")
+  }else if( var == "FC" || var == "PWP" || var == "HA"){
+    print("FC|PWP|HA")
     vhigh = 1
   }else{
     vhigh = 100

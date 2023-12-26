@@ -33,15 +33,15 @@ dataset = lapply(1:4, function(i){
   imgs_i = imgs[[index]];names(imgs_i)
   
   # standardized soilprofiles
-  files = list.files("D:/CLSoilMaps_old/materiales/Database/estandarizadas", full.names = TRUE);files
+  files.est = list.files("D:/CLSoilMaps_old/materiales/Database/estandarizadas", full.names = TRUE);files
   var_esp = c("Da","Arcilla","arena","Limo")
-  index = grep(paste0("^",var_esp[i]), basename(files));index
+  index = grep(paste0("^",var_esp[i]), basename(files.est));index
   
   
   # Esta parte de aqui es para leer las base de datos de la ultima version
   # files = list.files(here("D:/CLSoilMaps/proc/soil_database/standard"), full.names = TRUE);files
   # index = grep(tolower(variables[i]), files);index
-  soildata = read_csv(files[index]) %>%
+  soildata = read_csv(files.est[index]) %>%
     select(-c(`soil depth`, Fuente)) %>% 
     pivot_longer(cols = 2:7) %>% 
     filter(!is.na(value))
@@ -57,9 +57,9 @@ dataset = lapply(1:4, function(i){
   }else{
     inter=read_sf(inter.file)
   }
-  soil_points %>% filter(!(id %in% inter$id)) %>% 
-    write_sf(here("proc","vector",
-                  paste0("soilpoints_notin_ecoregions_",variables[i],".geojson")))
+  # soil_points %>% filter(!(id %in% inter$id)) %>% 
+  #   write_sf(here("proc","vector",
+  #                 paste0("soilpoints_notin_ecoregions_",variables[i],".geojson")), delete_layer = TRUE)
   r = imgs_i[[c(1,5,3,4,6,2)]]
   extr = lapply(1:6, function(k){
     depths = inter$name %>% unique
@@ -71,6 +71,7 @@ dataset = lapply(1:4, function(i){
            value_sim = extr[[2]], 
            value_obs = points$value)
   }) %>% bind_rows()
+  extr
   
   index = grep(tolower(variables[i]), sg.files);index
   r.sg = rast(list.files(sg.files[index], full.names = TRUE))
@@ -95,7 +96,7 @@ dataset = lapply(1:4, function(i){
     
   }) %>% bind_rows()
   extr2
-  full_join(extr, extr2, by = c("var","eco_name","depth","value_obs"))
+  bind_cols(extr, value_sg = extr2$value_sg)
 }) %>% bind_rows()
 
 

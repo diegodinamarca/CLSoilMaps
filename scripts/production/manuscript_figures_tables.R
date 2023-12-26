@@ -769,7 +769,10 @@ pmp = filter(bd, PMP !=-999) %>% select(ID, val = PMP)
                           total = n())%>% 
     mutate(n_profiles = nprof, propiedad = "Perm. Wilt. Point")
 }
+
 bd_summary <- bind_rows(df1,df2,df3,df4,df5,df6)
+bd_summary
+
 bd_summary %>% write_csv(here("results","tables","summary_bd.csv"))
 
 ######################## FIN PARTE 6 #####################
@@ -816,7 +819,7 @@ bd.p %>% filter(value != -999) %>%
 
 ######################## FIN PARTE 7 #####################
 #####-----------------------------------------------######
-############# PARTE 8: MAPAS 0-5cm ######################
+############# PARTE 8: MAPAS 5-15cm ######################
 
 # load soil maps
 dir <- here("results","postproc","v1","SoilMaps_MEAN")
@@ -859,13 +862,15 @@ plot.list[[4]] <- gplot(silt) +
 for (i in 1:4) {
   x = c("clay", "sand","bulkd","silt")
   ggsave(plot.list[[i]], filename = here("results","figures",
-                                         paste0(x[i],"_CLSM_100M_5-15cm.eps")), width = 4, height = 6)
+                                         paste0(x[i],"_CLSM_100M_5-15cm.svg")), width = 4, height = 6)
 }
 
 
 lay <- rbind(c(1,2,3))
 g <- arrangeGrob(grobs = plot.list[c(1,2,3)], layout_matrix = lay)
-ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm.eps"), width = 10, height = 10)
+ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm.svg"), width = 10, height = 10)
+ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm.pdf"), width = 10, height = 10)
+
 grid.arrange(grobs = plot.list, layout_matrix = lay)
 
 
@@ -873,7 +878,9 @@ lay <- rbind(c(1,2),
              c(3,4))
 # lay <- rbind(c(1,2,4,3))
 g <- arrangeGrob(grobs = plot.list, layout_matrix = lay)
-ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm_wsilt.eps"), width = 4, height = 6)
+ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm_wsilt.svg"), width = 10, height = 10)
+ggsave(plot = g, filename = here("results","figures","CLSM_100M_5-15cm_wsilt.pdf"), width = 10, height = 10)
+
 grid.arrange(grobs = plot.list, layout_matrix = lay)
 
 ######################## FIN PARTE 8 #####################
@@ -1027,7 +1034,7 @@ for (k in 1:3){
   
   plot.list[[k]] <- p.plot
   ggsave(filename = here::here("results", "figures", str_c("PICP_", var,".png")), plot = p.plot, width = 6, height = 5)
-  ggsave(filename = here::here("results", "figures", str_c("PICP_", var,".eps")), plot = p.plot, width = 6, height = 5)
+  ggsave(filename = here::here("results", "figures", str_c("PICP_", var,".svg")), plot = p.plot, width = 6, height = 5)
   
 }
 
@@ -1036,7 +1043,7 @@ xlay <- rbind(c(1,1,2,2),
 grid.arrange(plot.list[[1]], plot.list[[2]], plot.list[[3]], layout_matrix = xlay)
 p.plot = arrangeGrob(plot.list[[1]], plot.list[[2]], plot.list[[3]], layout_matrix = xlay)
 ggsave(filename = here::here("results","figures","PICP.png"), width = 9, height = 7, p.plot)
-ggsave(filename = here::here("results","figures","PICP.eps"), width = 9, height = 7, p.plot)
+ggsave(filename = here::here("results","figures","PICP.svg"), width = 9, height = 7, p.plot)
 
 ######################## FIN PARTE 9 #####################
 #####-----------------------------------------------######
@@ -1136,7 +1143,7 @@ for (k in 1:3){
   }
   m.plot
   ggsave(filename = here("results","figures",str_c("METRICS_",var,".png")), height = 5, width = 6, plot = m.plot)
-  ggsave(filename = here("results","figures",str_c("METRICS_",var,".eps")), height = 5, width = 6, plot = m.plot)
+  ggsave(filename = here("results","figures",str_c("METRICS_",var,".svg")), height = 5, width = 6, plot = m.plot)
   
   # p2.plot <- picp %>% ggplot(aes(x = quantile, y = q.value)) +
   #   geom_point()+
@@ -1154,7 +1161,7 @@ lay <- rbind(c(1,1,2,2),
 grid.arrange(metrics.plots[[1]], metrics.plots[[2]], metrics.plots[[3]], layout_matrix = lay)
 m.plot = arrangeGrob(metrics.plots[[1]], metrics.plots[[2]], metrics.plots[[3]], layout_matrix = lay)
 ggsave(filename = here("results","figures","METRICS.png"), height = 7, width = 10, plot = m.plot)
-ggsave(filename = here("results","figures","METRICS.eps"), height = 7, width = 10, plot = m.plot)
+ggsave(filename = here("results","figures","METRICS.svg"), height = 7, width = 10, plot = m.plot)
 
 
 ######################## FIN PARTE 10 ####################
@@ -1204,13 +1211,22 @@ for (i in 1:4) {
   png(filename = here("results","figures", str_c(var_eng,"_depths_1.png")), width = 600, height = 800, units = "px")
   print(lvlp)
   dev.off()
+  svg(filename = here("results","figures", str_c(var_eng,"_depths_1.svg")), width = 600, height = 800)
+  print(lvlp)
+  dev.off()
+  pdf(file = here("results","figures", str_c(var_eng,"_depths_1.pdf")), width = 600, height = 800)
+  print(lvlp)
+  dev.off()
   plot.list[[i]] <- lvlp
 }
 plot.list[[4]]
 lay <- rbind(c(1,2),
              c(3,4))
 g <- arrangeGrob(grobs = plot.list, layout_matrix = lay)
-ggsave(plot = g, filename = here("results","figures","CR2SOILS_physical_att.png"), width = 10, height = 12)
+ggsave(plot = g, filename = here("results","figures","CLSM_physical_att.png"), width = 10, height = 12)
+ggsave(plot = g, filename = here("results","figures","CLSM_physical_att.pdf"), width = 10, height = 12)
+ggsave(plot = g, filename = here("results","figures","CLSM_physical_att.svg"), width = 10, height = 12)
+
 # grid.arrange(grobs = plot.list, layout_matrix = lay)
 
 for (i in 1:4) {
@@ -1248,7 +1264,10 @@ plot.list[[4]]
 lay <- rbind(c(1,2),
              c(3,4))
 g <- arrangeGrob(grobs = plot.list, layout_matrix = lay)
-ggsave(plot = g, filename = here("results","figures","CR2SOILS_physical_att_suplement.png"), width = 10, height = 12)
+ggsave(plot = g, filename = here("results","figures","CLSM_physical_att_suplement.png"), width = 10, height = 12)
+ggsave(plot = g, filename = here("results","figures","CLSM_physical_att_suplement.pdf"), width = 10, height = 12)
+ggsave(plot = g, filename = here("results","figures","CLSM_physical_att_suplement.svg"), width = 10, height = 12)
+
 # grid.arrange(grobs = plot.list, layout_matrix = lay)
 
 for (i in 1:4) {
@@ -1261,7 +1280,7 @@ for (i in 1:4) {
   
   index <- lapply(depths.all, function(d){grep(pattern = d, files.var)}) %>% unlist;index
   imgs <- stack(files.var[index]);imgs
-  var_title = c("A) Bulk Density", "B) Clay",  "C) Sand", "D) Silt")
+  var_title = c("Bulk Density", "Clay",  "Sand", "Silt")
   names(imgs) <- paste0(depths.all,"cm")
   if (i == 1){breaks = seq(0.1,2.3,0.22)}
   if (i == 2){breaks = seq(0,70,10)}
@@ -1273,8 +1292,20 @@ for (i in 1:4) {
                          just = "left", 
                          x = grid::unit(5, "mm")))
   
-  lvlp <- rasterVis::levelplot(imgs, col.regions = colpal, at = breaks, main = var_title[i], par.settings=my.settings, names.attr = paste0(depths.all,"cm"));lvlp
-  png(filename = here("results","figures", str_c(var_eng,"_depths_all.png")), width = 600, height = 800, units = "px")
+  lvlp <- rasterVis::levelplot(imgs, col.regions = colpal, at = breaks, 
+                               main = var_title[i], 
+                               par.settings=my.settings, 
+                               names.attr = paste0(depths.all,"cm"));lvlp
+  # png(filename = here("results","figures", str_c(var_eng,"_depths_all.png")), width = 1200, height = 1000, units = "px")
+  # print(lvlp)
+  # dev.off()
+  # svg(filename = here("results","figures", str_c(var_eng,"_depths_all.svg")))
+  # print(lvlp)
+  # dev.off()
+  # pdf(file = here("results","figures", str_c(var_eng,"_depths_all.pdf")))
+  # print(lvlp)
+  # dev.off()
+  tiff(filename = here("results","figures", str_c(var_eng,"_depths_all.tiff")), width = 800, height = 600)
   print(lvlp)
   dev.off()
   plot.list[[i]] <- lvlp
@@ -1289,7 +1320,10 @@ lay <- rbind(c(1),
              c(3),
              c(4))
 g <- arrangeGrob(grobs = plot.list, layout_matrix = lay)
-ggsave(plot = g, filename = here("results","figures","CR2SOILS_physical_att_all.png"), width = 25, height = 35)
+ggsave(plot = g, filename = here("results","figures","CLSM_physical_att_all.png"), width = 25, height = 35)
+ggsave(plot = g, filename = here("results","figures","CLSM_physical_att_all.pdf"), width = 25, height = 35)
+ggsave(plot = g, filename = here("results","figures","CLSM_physical_att_all.svg"), width = 25, height = 35)
+
 grid.arrange(grobs = plot.list, layout_matrix = lay)
 
 ######################## FIN PARTE 11 ####################
@@ -1316,7 +1350,7 @@ colScale <- scale_fill_manual(name = NULL,values = myColors[-2], limits = levels
 cov_names <- read_csv(here("proc","var_sel","selected_covs.csv"))
 
 plot.list <- list()
-for (i in 2:3) {
+for (i in 1:3) {
   # i = 1
   # seleccionar variable
   var <- variables[i]
@@ -1413,7 +1447,7 @@ for (i in 2:3) {
   arrange <- ggpubr::ggarrange(plot.upper, plot.lower, nrow = 1, ncol = 2, common.legend = T, legend= setLegend(var))
   plot.list[[i]] <- arrange;arrange
   ggsave(here("results","figures",paste0("selected_covs_",var, ".png")), arrange, width = 20, height = 10, units = "cm")
-  ggsave(here("results","figures",paste0("selected_covs_",var, ".eps")), arrange, width = 20, height = 10, units = "cm")
+  ggsave(here("results","figures",paste0("selected_covs_",var, ".svg")), arrange, width = 20, height = 10, units = "cm")
   
   }
 
@@ -1422,7 +1456,7 @@ arrange <- ggpubr::ggarrange(plotlist = plot.list, nrow = 3, ncol = 1,
                              common.legend = TRUE, legend="bottom",
                              hjust = c(0.008,0,0));arrange
 ggsave(here("results","figures","selected_covs.png"), arrange, width = 20, height = 20, units = "cm")
-ggsave(here("results","figures","selected_covs.eps"), arrange, width = 20, height = 20, units = "cm")
+ggsave(here("results","figures","selected_covs.svg"), arrange, width = 20, height = 20, units = "cm")
 
 
 ######################## FIN PARTE 12 ####################
@@ -1472,14 +1506,15 @@ var.eng <- c("Bulk Density", "Clay", "Sand","Silt")
 outdir <- here("results","figures")
 
 p.list <- list()
-for (i in 2:3){
+for (i in 1:3){
   # i=1
   var <- variables[i]
   print(var)
   # mapas post-procesados PIRANGE
   files <- list.files(here("results","postproc","v1","PIRange"),
-                           full.names = TRUE, pattern = ".tif");pir.files
+                           full.names = TRUE, pattern = ".tif");files
   pir.files <- files[grep(var, files)][c(1,5,3,4,6,2)];pir.files
+  
   # mapas post-procesados MEAN PREDICTION
   files<- list.files(here("results","postproc","v1","SoilMaps_MEAN"), full.names = TRUE, pattern = ".tif")
   mean.files <- files[grep(var, files)][c(1,5,3,4,6,2)];mean.files
@@ -1487,7 +1522,7 @@ for (i in 2:3){
   imgs <- c(pir.files, mean.files) %>% rast
   names(imgs)
   names(imgs)[1:6] <- paste0(var,".", depths.nam,"_PI")
-  samp.df <- spatSample(imgs, size = 100000, method = "random", na.rm = TRUE, as.df = TRUE)
+  samp.df <- spatSample(imgs, size = 5000, method = "random", na.rm = TRUE, as.df = TRUE)
   samp.df
   
   pi <- samp.df %>% dplyr::select(ends_with("PI")) %>% 
@@ -1516,10 +1551,11 @@ for (i in 2:3){
     labs(x = if_else(var == "Bulkd", "Bulk density", var), y = "Prediction Interval width")+
     theme_bw()+
     scale_color_viridis()+
-    theme(axis.title = element_text(size = 16))
+    theme(axis.title = element_text(size = 16),
+          axis.text = element_text(size = 12))
   p.list[[i]] <- p
-  ggsave(filename = here(outdir,str_c(var,"_PI_vs_mean_points_density.png")), width = 4, height = 4)
-  ggsave(filename = here(outdir,str_c(var,"_PI_vs_mean_points_density.eps")), width = 4, height = 4)
+  ggsave(filename = here(outdir,str_c(var,"_PI_vs_mean_points_density_5000ptos.pdf")), width = 4, height = 4)
+  # ggsave(filename = here(outdir,str_c(var,"_PI_vs_mean_points_density.svg")), width = 4, height = 4)
   
 }
 ######################## FIN PARTE 14 ####################
@@ -1550,15 +1586,15 @@ metrics
 theme_set(theme_bw())
 p1 <- ggplot(data, aes(x = obs, y = sim)) +
   geom_point(alpha = 0.7, size = 0.7) +
-  geom_label(data = metrics, aes(label = message), x = 0.3, y = 0.75, size = 2) +
+  geom_label(data = metrics, aes(label = message), x = 0.3, y = 0.75, size = 2.5) +
   geom_smooth(method = "lm", se = T) +
   geom_abline(slope = 1, intercept = 0) +
   tune::coord_obs_pred() +
-  labs(x = "observed", y = "simulated", title = "A) Field Capacity") +
+  labs(x = "observed", y = "simulated", title = "a) Field Capacity") +
   facet_wrap(depth ~ .)
 plot(p1)
-ggsave(filename = here("results", "figures", "FC_correlation_R2.png"), width = 7, height = 5, plot = p1)
-ggsave(filename = here("results", "figures", "FC_correlation_R2.eps"), width = 7, height = 5, plot = p1)
+ggsave(filename = here("results", "figures", "FC_correlation_R2.pdf"), width = 7, height = 5, plot = p1)
+ggsave(filename = here("results", "figures", "FC_correlation_R2.svg"), width = 7, height = 5, plot = p1)
 
 # Permanent Wilting Point
 fname <- here("proc", "correlations", "PWP_correlation.csv")
@@ -1573,15 +1609,15 @@ metrics <- data %>%
 theme_set(theme_bw())
 p2 <- ggplot(data, aes(x = obs, y = sim)) +
   geom_point(alpha = 0.7, size = 0.7) +
-  geom_label(data = metrics, aes(label = message), x = 0.15, y = 0.44, size = 2) +
+  geom_label(data = metrics, aes(label = message), x = 0.15, y = 0.44, size = 2.5) +
   geom_smooth(method = "lm", se = T) +
   geom_abline(slope = 1, intercept = 0) +
   tune::coord_obs_pred() +
-  labs(x = "observed", y = "simulated", title = "B) Permanent Wilting Point") +
+  labs(x = "observed", y = "simulated", title = "b) Permanent Wilting Point") +
   facet_wrap(depth ~ .)
 plot(p2)
-ggsave(filename = here("results", "figures", "PWP_correlation_R2.png"), width = 7, height = 5, plot = p2)
-ggsave(filename = here("results", "figures", "PWP_correlation_R2.eps"), width = 7, height = 5, plot = p2)
+ggsave(filename = here("results", "figures", "PWP_correlation_R2.pdf"), width = 7, height = 5, plot = p2)
+ggsave(filename = here("results", "figures", "PWP_correlation_R2.svg"), width = 7, height = 5, plot = p2)
 
 arrange <- ggpubr::ggarrange(
   plotlist = list(p1, p2), nrow = 2, ncol = 1,
@@ -1589,8 +1625,8 @@ arrange <- ggpubr::ggarrange(
 )
 
 arrange
-ggsave(filename = here("results", "figures", "PWPandFC_correlation.png"), width = 7, height = 9)
-ggsave(filename = here("results", "figures", "PWPandFC_correlation.eps"), width = 12, height = 6)
+ggsave(filename = here("results", "figures", "PWPandFC_correlation.pdf"), width = 7, height = 10)
+ggsave(filename = here("results", "figures", "PWPandFC_correlation.svg"), width = 7, height = 10)
 
 ######################## FIN PARTE 15 ####################
 #####-----------------------------------------------######
